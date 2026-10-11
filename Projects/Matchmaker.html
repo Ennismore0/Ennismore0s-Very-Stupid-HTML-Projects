@@ -1,0 +1,1730 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Matchmaker</title>
+
+<style>
+* {
+    box-sizing: border-box;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+html, body {
+    margin: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+body {
+    background: #0c3d29;
+    color: white;
+}
+
+.game {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    min-width: 900px;
+    min-height: 650px;
+
+    background:
+        radial-gradient(
+            circle at center,
+            #21834f 0%,
+            #176b40 45%,
+            #0d4b2d 100%
+        );
+
+    overflow: hidden;
+}
+
+/* =========================================================
+   HEADER
+   ========================================================= */
+
+.header {
+    position: absolute;
+    top: 0;
+    left: 0;
+
+    width: 100%;
+    height: 70px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    background: rgba(0,0,0,0.15);
+}
+
+.title {
+    font-size: 32px;
+    font-weight: 900;
+    letter-spacing: 4px;
+
+    text-shadow:
+        0 3px 8px rgba(0,0,0,0.4);
+}
+
+.info {
+    position: absolute;
+    right: 18px;
+    top: 15px;
+
+    width: 40px;
+    height: 40px;
+
+    border: none;
+    border-radius: 50%;
+
+    background: rgba(255,255,255,0.15);
+    color: white;
+
+    font-size: 22px;
+    font-weight: bold;
+
+    cursor: pointer;
+
+    transition: 0.2s;
+}
+
+.info:hover {
+    background: rgba(255,255,255,0.28);
+    transform: scale(1.08);
+}
+
+/* =========================================================
+   STATS
+   ========================================================= */
+
+.stats {
+    position: absolute;
+    top: 84px;
+    left: 50%;
+
+    transform: translateX(-50%);
+
+    display: flex;
+    gap: 25px;
+
+    padding: 7px 18px;
+
+    border-radius: 20px;
+
+    background: rgba(0,0,0,0.18);
+
+    font-size: 14px;
+}
+
+.stats strong {
+    color: white;
+}
+
+/* =========================================================
+   TABLE
+   ========================================================= */
+
+.table {
+    position: absolute;
+
+    left: 50%;
+    top: 53%;
+
+    width: 1050px;
+    height: 480px;
+
+    transform: translate(-50%, -50%);
+}
+
+/* =========================================================
+   CARD
+   ========================================================= */
+
+.card {
+    position: absolute;
+
+    width: 86px;
+    height: 120px;
+
+    border-radius: 9px;
+
+    background: white;
+
+    box-shadow:
+        0 7px 14px rgba(0,0,0,0.35),
+        inset 0 0 0 1px rgba(0,0,0,0.12);
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    overflow: hidden;
+
+    font-weight: bold;
+
+    transition:
+        transform 0.5s ease,
+        opacity 0.5s ease;
+}
+
+.card.red {
+    color: #d52222;
+}
+
+.card.black {
+    color: #111;
+}
+
+.card.empty {
+    background: rgba(255,255,255,0.07);
+    border: 2px dashed rgba(255,255,255,0.22);
+
+    box-shadow: none;
+}
+
+.card.empty::after {
+    content: "?";
+
+    color: rgba(255,255,255,0.2);
+    font-size: 28px;
+}
+
+.corner {
+    position: absolute;
+
+    display: flex;
+    flex-direction: column;
+
+    align-items: center;
+
+    font-size: 15px;
+    line-height: 16px;
+}
+
+.corner.top {
+    left: 7px;
+    top: 6px;
+}
+
+.corner.bottom {
+    right: 7px;
+    bottom: 6px;
+
+    transform: rotate(180deg);
+}
+
+.symbol {
+    font-size: 42px;
+}
+
+/* =========================================================
+   CARD BACK
+   ========================================================= */
+
+.card-back {
+    position: absolute;
+
+    width: 86px;
+    height: 120px;
+
+    border-radius: 9px;
+
+    background:
+        repeating-linear-gradient(
+            45deg,
+            #183e91,
+            #183e91 7px,
+            #2853aa 7px,
+            #2853aa 14px
+        );
+
+    border: 4px solid white;
+
+    box-shadow:
+        0 7px 14px rgba(0,0,0,0.35);
+
+    transition:
+        transform 0.6s ease,
+        opacity 0.6s ease;
+}
+
+/* =========================================================
+   PILE LABEL
+   ========================================================= */
+
+.label {
+    position: absolute;
+
+    transform: translateX(-50%);
+
+    font-size: 12px;
+    font-weight: bold;
+
+    text-transform: uppercase;
+    letter-spacing: 1px;
+
+    color: rgba(255,255,255,0.75);
+
+    white-space: nowrap;
+
+    text-shadow:
+        0 2px 4px rgba(0,0,0,0.4);
+}
+
+/* =========================================================
+   LEFT / DRAW / RIGHT
+   ========================================================= */
+
+.left-pile {
+    position: absolute;
+
+    left: 275px;
+    top: 185px;
+
+    width: 86px;
+    height: 120px;
+}
+
+.left-pile .label {
+    left: 43px;
+    top: 130px;
+}
+
+.draw-pile {
+    position: absolute;
+
+    left: 482px;
+    top: 185px;
+
+    width: 86px;
+    height: 120px;
+}
+
+.draw-pile .label {
+    left: 43px;
+    top: 130px;
+}
+
+.right-pile {
+    position: absolute;
+
+    left: 689px;
+    top: 185px;
+
+    width: 86px;
+    height: 120px;
+}
+
+.right-pile .label {
+    left: 43px;
+    top: 130px;
+}
+
+/* =========================================================
+   DISCARD
+   ========================================================= */
+
+.discard-pile {
+    position: absolute;
+
+    left: 482px;
+    top: 345px;
+
+    width: 86px;
+    height: 120px;
+}
+
+.discard-pile .label {
+    left: 43px;
+    top: 130px;
+}
+
+/* =========================================================
+   SETS
+   ========================================================= */
+
+.set {
+    position: absolute;
+
+    width: 86px;
+    height: 120px;
+}
+
+.set-label {
+    position: absolute;
+
+    width: 100%;
+
+    text-align: center;
+
+    font-size: 12px;
+    font-weight: bold;
+
+    color: rgba(255,255,255,0.75);
+
+    white-space: nowrap;
+}
+
+/* Set 1 — above left pile */
+
+.set1 {
+    left: 275px;
+    top: 15px;
+}
+
+.set1 .set-label {
+    top: -22px;
+}
+
+/* Set 2 — above draw pile */
+
+.set2 {
+    left: 482px;
+    top: 15px;
+}
+
+.set2 .set-label {
+    top: -22px;
+}
+
+/* Set 3 — above right pile */
+
+.set3 {
+    left: 689px;
+    top: 15px;
+}
+
+.set3 .set-label {
+    top: -22px;
+}
+
+/* Set 4 — right of right pile */
+
+.set4 {
+    left: 850px;
+    top: 185px;
+}
+
+.set4 .set-label {
+    top: 130px;
+}
+
+/* Set 5 — left of left pile */
+
+.set5 {
+    left: 114px;
+    top: 185px;
+}
+
+.set5 .set-label {
+    top: 130px;
+}
+
+.set-placeholder {
+    position: absolute;
+
+    width: 86px;
+    height: 120px;
+
+    border-radius: 9px;
+
+    border: 2px dashed rgba(255,255,255,0.2);
+
+    background: rgba(255,255,255,0.035);
+}
+
+/* =========================================================
+   DRAW COUNT
+   ========================================================= */
+
+.draw-count {
+    position: absolute;
+
+    left: 50%;
+    top: 140px;
+
+    transform: translateX(-50%);
+
+    font-size: 12px;
+
+    color: rgba(255,255,255,0.7);
+
+    white-space: nowrap;
+}
+
+/* =========================================================
+   CONTROLS
+   ========================================================= */
+
+.controls {
+    position: absolute;
+
+    bottom: 25px;
+    left: 50%;
+
+    transform: translateX(-50%);
+
+    display: flex;
+    gap: 12px;
+}
+
+.control {
+    border: none;
+
+    padding: 12px 24px;
+
+    border-radius: 10px;
+
+    background: white;
+    color: #123;
+
+    font-size: 15px;
+    font-weight: bold;
+
+    cursor: pointer;
+
+    box-shadow:
+        0 5px 12px rgba(0,0,0,0.25);
+
+    transition: 0.15s;
+}
+
+.control:hover {
+    transform: translateY(-2px);
+}
+
+.control.primary {
+    background: #ffd84a;
+}
+
+/* =========================================================
+   MESSAGE
+   ========================================================= */
+
+.message {
+    position: absolute;
+
+    left: 50%;
+    top: 325px;
+
+    transform:
+        translate(-50%, -50%)
+        scale(0.8);
+
+    padding: 10px 25px;
+
+    border-radius: 30px;
+
+    background: #ffd84a;
+    color: #332700;
+
+    font-size: 23px;
+    font-weight: 900;
+
+    opacity: 0;
+
+    pointer-events: none;
+
+    transition:
+        opacity 0.4s,
+        transform 0.4s;
+}
+
+.message.show {
+    opacity: 1;
+
+    transform:
+        translate(-50%, -50%)
+        scale(1);
+}
+
+/* =========================================================
+   MODAL
+   ========================================================= */
+
+.overlay {
+    position: fixed;
+
+    inset: 0;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    background: rgba(0,0,0,0.65);
+
+    opacity: 0;
+    pointer-events: none;
+
+    transition: opacity 0.25s;
+
+    z-index: 100;
+}
+
+.overlay.open {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.modal {
+    width: min(520px, 90vw);
+
+    padding: 28px;
+
+    border-radius: 18px;
+
+    background: white;
+    color: #111;
+
+    box-shadow:
+        0 20px 60px rgba(0,0,0,0.5);
+
+    transform: translateY(20px);
+
+    transition: transform 0.25s;
+}
+
+.overlay.open .modal {
+    transform: translateY(0);
+}
+
+.modal h2 {
+    margin-top: 0;
+}
+
+.modal li {
+    margin-bottom: 10px;
+    line-height: 1.45;
+}
+
+.close {
+    float: right;
+
+    border: none;
+    background: #eee;
+
+    width: 32px;
+    height: 32px;
+
+    border-radius: 50%;
+
+    font-size: 20px;
+
+    cursor: pointer;
+}
+
+/* =========================================================
+   GAME OVER
+   ========================================================= */
+
+.game-over-box {
+    text-align: center;
+}
+
+.game-over-box h2 {
+    font-size: 32px;
+}
+
+/* =========================================================
+   RESPONSIVE
+   ========================================================= */
+
+@media (max-width: 1100px) {
+
+    .table {
+        transform:
+            translate(-50%, -50%)
+            scale(0.85);
+    }
+}
+
+@media (max-width: 900px) {
+
+    .game {
+        min-width: 0;
+    }
+
+    .table {
+        transform:
+            translate(-50%, -50%)
+            scale(0.7);
+    }
+}
+</style>
+</head>
+
+<body>
+
+<div class="game">
+
+    <header class="header">
+
+        <div class="title">
+            MATCHMAKER
+        </div>
+
+        <button
+            class="info"
+            id="infoButton"
+        >
+            ℹ️
+        </button>
+
+    </header>
+
+
+    <div class="stats">
+
+        <span>
+            Sets:
+            <strong id="setCount">0</strong>
+        </span>
+
+        <span>
+            Rounds:
+            <strong id="roundCount">0</strong>
+        </span>
+
+        <span>
+            Cards:
+            <strong id="cardsLeft">54</strong>
+        </span>
+
+    </div>
+
+
+    <main class="table">
+
+        <!-- SET 5 -->
+
+        <div class="set set5" id="set5">
+
+            <div class="set-label">
+                Set 5
+            </div>
+
+            <div class="set-placeholder"></div>
+
+        </div>
+
+
+        <!-- SET 1 -->
+
+        <div class="set set1" id="set1">
+
+            <div class="set-label">
+                Set 1
+            </div>
+
+            <div class="set-placeholder"></div>
+
+        </div>
+
+
+        <!-- SET 2 -->
+
+        <div class="set set2" id="set2">
+
+            <div class="set-label">
+                Set 2
+            </div>
+
+            <div class="set-placeholder"></div>
+
+        </div>
+
+
+        <!-- SET 3 -->
+
+        <div class="set set3" id="set3">
+
+            <div class="set-label">
+                Set 3
+            </div>
+
+            <div class="set-placeholder"></div>
+
+        </div>
+
+
+        <!-- SET 4 -->
+
+        <div class="set set4" id="set4">
+
+            <div class="set-label">
+                Set 4
+            </div>
+
+            <div class="set-placeholder"></div>
+
+        </div>
+
+
+        <!-- LEFT PILE -->
+
+        <div class="left-pile">
+
+            <div
+                class="card empty"
+                id="leftCard"
+            ></div>
+
+            <div class="label">
+                Left Pile
+            </div>
+
+        </div>
+
+
+        <!-- DRAW PILE -->
+
+        <div class="draw-pile">
+
+            <div
+                class="card-back"
+                id="drawBack"
+            ></div>
+
+            <div class="draw-count" id="drawCount">
+                54 cards
+            </div>
+
+            <div class="label">
+                Draw Pile
+            </div>
+
+        </div>
+
+
+        <!-- RIGHT PILE -->
+
+        <div class="right-pile">
+
+            <div
+                class="card empty"
+                id="rightCard"
+            ></div>
+
+            <div class="label">
+                Right Pile
+            </div>
+
+        </div>
+
+
+        <!-- DISCARD -->
+
+        <div class="discard-pile">
+
+            <div
+                class="card empty"
+                id="discardCard"
+            ></div>
+
+            <div class="label">
+                Discard Pile
+            </div>
+
+        </div>
+
+
+        <div
+            class="message"
+            id="message"
+        >
+            ✨ 𝓢𝓔𝓣! ✨
+        </div>
+
+    </main>
+
+
+    <div class="controls">
+
+        <button
+            class="control primary"
+            id="drawButton"
+        >
+            Draw Cards
+        </button>
+
+        <button
+            class="control"
+            id="restartButton"
+        >
+            Restart
+        </button>
+
+    </div>
+
+</div>
+
+
+<!-- =========================================================
+     INFO MODAL
+     ========================================================= -->
+
+<div
+    class="overlay"
+    id="infoOverlay"
+>
+
+    <div class="modal">
+
+        <button
+            class="close"
+            id="closeInfo"
+        >
+            ×
+        </button>
+
+        <h2>🃏 How to Play</h2>
+
+        <ol>
+
+            <li>
+                Flip one card onto the Left Pile.
+            </li>
+
+            <li>
+                Flip one card onto the Right Pile.
+            </li>
+
+            <li>
+                If the two cards have the same rank,
+                you have made a <strong>Set</strong>.
+            </li>
+
+            <li>
+                The two cards are placed into the
+                Set pile.
+            </li>
+
+            <li>
+                If they don't match, both cards go
+                into the Discard Pile.
+            </li>
+
+            <li>
+                Continue until the Draw Pile is empty.
+            </li>
+
+            <li>
+                When the Draw Pile is empty, stack
+                your Sets together to create a new
+                Draw Pile.
+            </li>
+
+            <li>
+                Keep going and see how many Sets
+                you can make!
+            </li>
+
+        </ol>
+
+        <p>
+            Suits don't matter — only the card's rank.
+        </p>
+
+    </div>
+
+</div>
+
+
+<!-- =========================================================
+     JAVASCRIPT
+     ========================================================= -->
+
+<script>
+
+const suits = [
+    "♠",
+    "♥",
+    "♦",
+    "♣"
+];
+
+const ranks = [
+    "𝔸",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "10",
+    "𝕁",
+    "ℚ",
+    "𝕂"
+];
+
+
+let drawPile = [];
+let discardPile = [];
+
+let sets = [];
+
+let leftCard = null;
+let rightCard = null;
+
+let round = 0;
+
+let busy = false;
+
+
+/* =========================================================
+   CREATE DECK
+   ========================================================= */
+
+function createDeck() {
+
+    const deck = [];
+
+    for (const suit of suits) {
+
+        for (const rank of ranks) {
+
+            deck.push({
+                rank: rank,
+                suit: suit
+            });
+
+        }
+
+    }
+
+    deck.push({
+        rank: "JOKER",
+        suit: ""
+    });
+
+    deck.push({
+        rank: "JOKER",
+        suit: ""
+    });
+
+    return deck;
+}
+
+
+/* =========================================================
+   SHUFFLE
+   ========================================================= */
+
+function shuffle(deck) {
+
+    for (
+        let i = deck.length - 1;
+        i > 0;
+        i--
+    ) {
+
+        const j =
+            Math.floor(Math.random() * (i + 1));
+
+        [
+            deck[i],
+            deck[j]
+        ] = [
+            deck[j],
+            deck[i]
+        ];
+
+    }
+
+    return deck;
+}
+
+
+/* =========================================================
+   START
+   ========================================================= */
+
+function startGame() {
+
+    drawPile =
+        shuffle(createDeck());
+
+    discardPile = [];
+
+    sets = [];
+
+    leftCard = null;
+    rightCard = null;
+
+    round = 0;
+
+    busy = false;
+
+    clearCard(
+        document.getElementById("leftCard")
+    );
+
+    clearCard(
+        document.getElementById("rightCard")
+    );
+
+    clearCard(
+        document.getElementById("discardCard")
+    );
+
+    clearSets();
+
+    updateUI();
+
+}
+
+
+/* =========================================================
+   DRAW
+   ========================================================= */
+
+async function drawCards() {
+
+    if (busy) return;
+
+    busy = true;
+
+    /*
+       If there aren't enough cards to perform
+       another round, recycle the Sets.
+    */
+
+    if (drawPile.length < 2) {
+
+        recycleSets();
+
+    }
+
+    if (drawPile.length < 2) {
+
+        busy = false;
+
+        return;
+
+    }
+
+    round++;
+
+    /*
+       LEFT CARD
+    */
+
+    leftCard =
+        drawPile.pop();
+
+    await delay(300);
+
+    showCard(
+        document.getElementById("leftCard"),
+        leftCard
+    );
+
+    await delay(800);
+
+
+    /*
+       RIGHT CARD
+    */
+
+    rightCard =
+        drawPile.pop();
+
+    await delay(300);
+
+    showCard(
+        document.getElementById("rightCard"),
+        rightCard
+    );
+
+    /*
+       Let the player actually look at them.
+    */
+
+    await delay(1200);
+
+
+    /*
+       RESOLVE
+    */
+
+    if (
+        leftCard.rank === rightCard.rank
+    ) {
+
+        await makeSet();
+
+    } else {
+
+        await moveToDiscard();
+
+    }
+
+
+    await delay(700);
+
+    clearCard(
+        document.getElementById("leftCard")
+    );
+
+    clearCard(
+        document.getElementById("rightCard")
+    );
+
+    leftCard = null;
+    rightCard = null;
+
+    updateUI();
+
+    busy = false;
+
+}
+
+
+/* =========================================================
+   SHOW CARD
+   ========================================================= */
+
+function showCard(element, card) {
+
+    element.className = "card";
+
+    if (card.rank === "JOKER") {
+
+        element.classList.add("black");
+
+        element.innerHTML = `
+            <div class="symbol">🃏</div>
+        `;
+
+        element.style.transform =
+            "translateY(-12px)";
+
+        setTimeout(() => {
+
+            element.style.transform =
+                "translateY(0)";
+
+        }, 500);
+
+        return;
+    }
+
+    const red =
+        card.suit === "♥" ||
+        card.suit === "♦";
+
+    element.classList.add(
+        red ? "red" : "black"
+    );
+
+    element.innerHTML = `
+
+        <div class="corner top">
+            <span>${card.rank}</span>
+            <span>${card.suit}</span>
+        </div>
+
+        <div class="symbol">
+            ${card.suit}
+        </div>
+
+        <div class="corner bottom">
+            <span>${card.rank}</span>
+            <span>${card.suit}</span>
+        </div>
+
+    `;
+
+    element.style.transform =
+        "translateY(-12px)";
+
+    setTimeout(() => {
+
+        element.style.transform =
+            "translateY(0)";
+
+    }, 500);
+
+}
+
+
+/* =========================================================
+   MAKE SET
+   ========================================================= */
+
+async function makeSet() {
+
+    /*
+       The matching cards surround the ENTIRE
+       current discard pile.
+
+       Left card goes underneath.
+       Right card goes on top.
+    */
+
+    const newSet = [
+        leftCard,
+        ...discardPile,
+        rightCard
+    ];
+
+    const setNumber = sets.length + 1;
+
+    sets.push(newSet);
+
+    const message =
+        document.getElementById("message");
+
+    message.textContent =
+        `✨ 𝓢𝓔𝓣 ${setNumber}! ✨`;
+
+    message.classList.add("show");
+
+    await delay(600);
+
+    message.classList.remove("show");
+
+    /*
+       Move the ENTIRE discard pile into
+       the Set slot.
+    */
+
+    renderSet(
+        setNumber,
+        newSet
+    );
+
+    /*
+       The discard pile is now empty.
+    */
+
+    discardPile = [];
+
+    clearCard(
+        document.getElementById("discardCard")
+    );
+
+    updateUI();
+}
+
+/* =========================================================
+   RENDER SET
+   ========================================================= */
+
+function renderSet(number, cards) {
+
+    const set =
+        document.getElementById(
+            "set" + number
+        );
+
+    if (!set) return;
+
+    set.innerHTML = `
+        <div class="set-label">
+            Set ${number}
+        </div>
+    `;
+
+    /*
+       Show the entire Set as a stacked pile.
+
+       Only the top few cards are offset visually
+       so we can tell that there are multiple cards.
+    */
+
+    const visibleCards =
+        Math.min(cards.length, 6);
+
+    const start =
+        cards.length - visibleCards;
+
+    for (
+        let i = start;
+        i < cards.length;
+        i++
+    ) {
+
+        const card =
+            createMiniCard(cards[i]);
+
+        card.style.position =
+            "absolute";
+
+        const offset =
+            (i - start) * 2;
+
+        card.style.left =
+            `${offset}px`;
+
+        card.style.top =
+            `${offset}px`;
+
+        /*
+           Later cards are on top.
+        */
+
+        card.style.zIndex =
+            i;
+
+        set.appendChild(card);
+    }
+
+}
+
+/* =========================================================
+   MINI CARD
+   ========================================================= */
+
+function createMiniCard(card) {
+
+    const element =
+        document.createElement("div");
+
+    element.className =
+        "card";
+
+    element.style.position =
+        "absolute";
+
+    element.style.width =
+        "86px";
+
+    element.style.height =
+        "120px";
+
+    if (card.rank === "JOKER") {
+
+        element.classList.add("black");
+
+        element.innerHTML =
+            `<div class="symbol">🃏</div>`;
+
+        return element;
+
+    }
+
+    const red =
+        card.suit === "♥" ||
+        card.suit === "♦";
+
+    element.classList.add(
+        red ? "red" : "black"
+    );
+
+    element.innerHTML = `
+
+        <div class="corner top">
+            <span>${card.rank}</span>
+            <span>${card.suit}</span>
+        </div>
+
+        <div class="symbol">
+            ${card.suit}
+        </div>
+
+        <div class="corner bottom">
+            <span>${card.rank}</span>
+            <span>${card.suit}</span>
+        </div>
+
+    `;
+
+    return element;
+
+}
+
+
+/* =========================================================
+   DISCARD
+   ========================================================= */
+
+async function moveToDiscard() {
+
+    discardPile.push(
+        leftCard,
+        rightCard
+    );
+
+    /*
+       The last discarded card becomes
+       visible underneath the draw pile.
+    */
+
+    showCard(
+        document.getElementById("discardCard"),
+        rightCard
+    );
+
+    await delay(350);
+
+}
+
+
+/* =========================================================
+   RECYCLE SETS
+   ========================================================= */
+
+function recycleSets() {
+
+    if (sets.length === 0) {
+        return;
+    }
+
+    const newDeck = [];
+
+    for (const set of sets) {
+
+        for (const card of set) {
+
+            newDeck.push(card);
+
+        }
+
+    }
+
+    drawPile =
+        shuffle(newDeck);
+
+    sets = [];
+
+    clearSets();
+
+    clearCard(
+        document.getElementById("discardCard")
+    );
+
+    updateUI();
+}
+
+/* =========================================================
+   CLEAR SETS
+   ========================================================= */
+
+function clearSets() {
+
+    for (
+        let i = 1;
+        i <= 5;
+        i++
+    ) {
+
+        const set =
+            document.getElementById(
+                "set" + i
+            );
+
+        if (!set) continue;
+
+        set.innerHTML = `
+            <div class="set-label">
+                Set ${i}
+            </div>
+
+            <div class="set-placeholder"></div>
+        `;
+
+    }
+
+}
+
+
+/* =========================================================
+   CLEAR CARD
+   ========================================================= */
+
+function clearCard(element) {
+
+    element.className =
+        "card empty";
+
+    element.innerHTML = "";
+
+    element.style.transform =
+        "translateY(0)";
+
+}
+
+
+/* =========================================================
+   UI
+   ========================================================= */
+
+function updateUI() {
+
+    document.getElementById(
+        "setCount"
+    ).textContent =
+        sets.length;
+
+    document.getElementById(
+        "roundCount"
+    ).textContent =
+        round;
+
+    document.getElementById(
+        "cardsLeft"
+    ).textContent =
+        drawPile.length;
+
+    document.getElementById(
+        "drawCount"
+    ).textContent =
+        `${drawPile.length} card${
+            drawPile.length === 1
+                ? ""
+                : "s"
+        }`;
+
+    const back =
+        document.getElementById(
+            "drawBack"
+        );
+
+    back.style.opacity =
+        drawPile.length > 0
+            ? "1"
+            : "0";
+
+}
+
+
+/* =========================================================
+   DELAY
+   ========================================================= */
+
+function delay(ms) {
+
+    return new Promise(
+        resolve => setTimeout(
+            resolve,
+            ms
+        )
+    );
+
+}
+
+
+/* =========================================================
+   BUTTONS
+   ========================================================= */
+
+document.getElementById(
+    "drawButton"
+).addEventListener(
+    "click",
+    drawCards
+);
+
+document.getElementById(
+    "restartButton"
+).addEventListener(
+    "click",
+    startGame
+);
+
+
+/* =========================================================
+   INFO
+   ========================================================= */
+
+const infoOverlay =
+    document.getElementById(
+        "infoOverlay"
+    );
+
+document.getElementById(
+    "infoButton"
+).addEventListener(
+    "click",
+    () => {
+
+        infoOverlay.classList.add(
+            "open"
+        );
+
+    }
+);
+
+document.getElementById(
+    "closeInfo"
+).addEventListener(
+    "click",
+    () => {
+
+        infoOverlay.classList.remove(
+            "open"
+        );
+
+    }
+);
+
+infoOverlay.addEventListener(
+    "click",
+    event => {
+
+        if (
+            event.target === infoOverlay
+        ) {
+
+            infoOverlay.classList.remove(
+                "open"
+            );
+
+        }
+
+    }
+);
+
+
+/* =========================================================
+   SPACEBAR
+   ========================================================= */
+
+document.addEventListener(
+    "keydown",
+    event => {
+
+        if (
+            event.code === "Space" &&
+            !event.repeat
+        ) {
+
+            event.preventDefault();
+
+            drawCards();
+
+        }
+
+        if (
+            event.code === "Escape"
+        ) {
+
+            infoOverlay.classList.remove(
+                "open"
+            );
+
+        }
+
+    }
+);
+
+
+/* =========================================================
+   START
+   ========================================================= */
+
+startGame();
+
+</script>
+
+</body>
+</html>
