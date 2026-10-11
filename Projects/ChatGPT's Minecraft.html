@@ -1,0 +1,274 @@
+from pathlib import Path
+
+html = r'''<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MineCraft HTML — Single File Edition</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;font-family:Arial,sans-serif}
+canvas{display:block;width:100%;height:100%;image-rendering:pixelated}
+#crosshair{position:fixed;left:50%;top:50%;width:20px;height:20px;transform:translate(-50%,-50%);pointer-events:none}
+#crosshair:before,#crosshair:after{content:"";position:absolute;background:#fff;box-shadow:0 0 2px #000}
+#crosshair:before{width:2px;height:18px;left:9px;top:1px}.#crosshair:after{height:2px;width:18px;left:1px;top:9px}
+#hud{position:fixed;left:50%;bottom:12px;transform:translateX(-50%);display:flex;gap:4px;pointer-events:none}
+.slot{width:52px;height:52px;border:3px solid #777;background:#222c;box-shadow:inset 0 0 0 2px #111;position:relative}
+.slot.selected{border-color:#fff;box-shadow:0 0 0 2px #555,inset 0 0 0 2px #111}
+.slot b{position:absolute;left:4px;bottom:2px;color:#fff;font-size:12px;text-shadow:2px 2px #000}
+.slot .icon{position:absolute;left:11px;top:10px;width:24px;height:24px;image-rendering:pixelated}
+#help{position:fixed;left:12px;top:12px;color:#fff;text-shadow:2px 2px #000;font-size:14px;line-height:1.5;background:#0005;padding:8px}
+#status{position:fixed;right:12px;top:12px;color:#fff;text-shadow:2px 2px #000;text-align:right}
+#menu{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#0008;color:#fff;text-align:center}
+#menu .box{background:#222e;border:3px solid #777;padding:24px;max-width:520px}
+button{font-size:18px;padding:10px 24px;cursor:pointer}
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="crosshair"></div>
+<div id="hud"></div>
+<div id="help">WASD: move · Space: jump · Shift: sprint<br>Left click: break · Right click: place · 1–9: select · Esc: release mouse</div>
+<div id="status"></div>
+<div id="menu"><div class="box">
+<h1>Minecraft HTML</h1>
+<p>A single-file, no-library voxel sandbox.</p>
+<p>Click <b>Play</b>, then click the world to capture the mouse.</p>
+<button id="play">Play</button>
+</div></div>
+<script>
+"use strict";
+
+/* =========================================================
+   MINECRAFT HTML — compact voxel sandbox
+   Everything lives in this one file: renderer, world,
+   procedural terrain, collision, raycasting, hotbar, etc.
+   ========================================================= */
+
+const canvas=document.getElementById("game"),ctx=canvas.getContext("2d");
+const menu=document.getElementById("menu"),play=document.getElementById("play");
+const hud=document.getElementById("hud"),status=document.getElementById("status");
+let W=innerWidth,H=innerHeight,DPR=Math.min(devicePixelRatio||1,2);
+function resize(){W=innerWidth;H=innerHeight;canvas.width=W*DPR;canvas.height=H*DPR;ctx.setTransform(DPR,0,0,DPR,0,0)}
+addEventListener("resize",resize);resize();
+
+const AIR=0,GRASS=1,DIRT=2,STONE=3,WOOD=4,LEAVES=5,SAND=6,GLASS=7,PLANKS=8,BRICK=9,COAL=10;
+const names=["Air","Grass","Dirt","Stone","Wood","Leaves","Sand","Glass","Planks","Bricks","Coal"];
+const colors={1:"#6aa33a",2:"#8b5a2b",3:"#777",4:"#76502c",5:"#3e8f38",6:"#d8c27a",7:"#8ed6e8",8:"#b9824a",9:"#a84d3d",10:"#333"};
+const hot=[GRASS,DIRT,STONE,WOOD,LEAVES,SAND,GLASS,PLANKS,BRICK];
+let selected=0;
+
+function buildHUD(){
+  hud.innerHTML="";
+  hot.forEach((id,i)=>{
+    const s=document.createElement("div");s.className="slot"+(i===selected?" selected":"");
+    s.innerHTML=`<div class="icon" style="background:${colors[id]}"></div><b>${i+1}</b>`;
+    hud.appendChild(s);
+  });
+}
+buildHUD();
+
+const SIZE=64, MAXY=32;
+const blocks=new Uint8Array(SIZE*MAXY*SIZE);
+const idx=(x,y,z)=>x+SIZE*(z+SIZE*y);
+const inside=(x,y,z)=>x>=0&&x<SIZE&&z>=0&&z<SIZE&&y>=0&&y<MAXY;
+function get(x,y,z){if(!inside(x,y,z))return y<0?STONE:AIR;return blocks[idx(x,y,z)]}
+function set(x,y,z,v){if(inside(x,y,z))blocks[idx(x,y,z)]=v}
+
+function hash(x,z){let n=Math.sin(x*127.1+z*311.7)*43758.5453;return n-Math.floor(n)}
+function noise(x,z){
+  const x0=Math.floor(x),z0=Math.floor(z),fx=x-x0,fz=z-z0;
+  const a=hash(x0,z0),b=hash(x0+1,z0),c=hash(x0,z0+1),d=hash(x0+1,z0+1);
+  const u=fx*fx*(3-2*fx),v=fz*fz*(3-2*fz);
+  return a+(b-a)*u+((c+(d-c)*u)-(a+(b-a)*u))*v;
+}
+function terrainHeight(x,z){
+  let n=0,amp=1,f=0.025;
+  for(let i=0;i<5;i++){n+=noise(x*f,z*f)*amp;amp*=.5;f*=2}
+  return Math.floor(7+n*13);
+}
+function generate(){
+  for(let x=0;x<SIZE;x++)for(let z=0;z<SIZE;z++){
+    const h=Math.min(MAXY-5,terrainHeight(x,z));
+    for(let y=0;y<=h;y++){
+      let b=y===h?GRASS:y>h-4?DIRT:STONE;
+      if(h<8 && y===h)b=SAND;
+      set(x,y,z,b);
+    }
+    if(hash(x*3,z*7)>.985 && h>8 && x>3&&z>3&&x<SIZE-4&&z<SIZE-4){
+      for(let y=h+1;y<h+5;y++)set(x,y,z,WOOD);
+      for(let dx=-2;dx<=2;dx++)for(let dz=-2;dz<=2;dz++)for(let dy=2;dy<=4;dy++){
+        if(Math.abs(dx)+Math.abs(dz)+(dy===4?1:0)<4)set(x+dx,h+dy,z+dz,LEAVES);
+      }
+    }
+  }
+}
+generate();
+
+const p={x:32.5,y:15,z:32.5,vy:0,yaw:0,pitch:0,onGround:false};
+for(let y=MAXY-1;y>0;y--)if(get(32,y,32)!==AIR){p.y=y+1.01;break}
+const keys={};let locked=false;
+addEventListener("keydown",e=>{
+  keys[e.code]=true;
+  if(e.code.startsWith("Digit")){
+    const n=+e.code.slice(5)-1;if(n>=0&&n<9){selected=n;buildHUD()}
+  }
+  if(e.code==="Escape")document.exitPointerLock();
+});
+addEventListener("keyup",e=>keys[e.code]=false);
+canvas.addEventListener("click",()=>canvas.requestPointerLock());
+document.addEventListener("pointerlockchange",()=>{locked=document.pointerLockElement===canvas;if(locked)menu.classList.add("hidden")});
+document.addEventListener("mousemove",e=>{
+  if(!locked)return;
+  p.yaw-=e.movementX*.0025;
+  p.pitch-=e.movementY*.0025;
+  p.pitch=Math.max(-1.45,Math.min(1.45,p.pitch));
+});
+play.onclick=()=>{menu.classList.add("hidden");canvas.requestPointerLock()};
+
+let prev=performance.now(),fps=0,frames=0,fpsTime=0;
+
+function collides(x,y,z){
+  const r=.3,h=1.8;
+  for(let ix=Math.floor(x-r);ix<=Math.floor(x+r);ix++)
+    for(let iz=Math.floor(z-r);iz<=Math.floor(z+r);iz++)
+      for(let iy=Math.floor(y);iy<=Math.floor(y+h);iy++)
+        if(get(ix,iy,iz)!==AIR && get(ix,iy,iz)!==LEAVES)return true;
+  return false;
+}
+function move(dt){
+  let dx=0,dz=0;
+  const f=(keys.KeyW?1:0)-(keys.KeyS?1:0),s=(keys.KeyD?1:0)-(keys.KeyA?1:0);
+  const len=Math.hypot(f,s)||1, speed=(keys.ShiftLeft||keys.ShiftRight)?7:4.5;
+  const ca=Math.cos(p.yaw),sa=Math.sin(p.yaw);
+  dx=(f*ca+s*sa)/len*speed*dt;
+  dz=(f*sa-s*ca)/len*speed*dt;
+  if(!collides(p.x+dx,p.y,p.z))p.x+=dx;
+  if(!collides(p.x,p.y,p.z+dz))p.z+=dz;
+  p.vy-=20*dt;
+  if((keys.Space||keys.KeyZ)&&p.onGround){p.vy=8; p.onGround=false}
+  let ny=p.y+p.vy*dt;
+  if(!collides(p.x,ny,p.z)){p.y=ny;p.onGround=false}
+  else{
+    if(p.vy<0)p.onGround=true;
+    p.vy=0;
+    // tiny upward correction to sit on ground
+    while(collides(p.x,p.y,p.z))p.y+=.01;
+  }
+  p.x=Math.max(.4,Math.min(SIZE-.4,p.x));p.z=Math.max(.4,Math.min(SIZE-.4,p.z));
+}
+
+function raycast(max=7){
+  const cp=Math.cos(p.pitch),sp=Math.sin(p.pitch),cy=Math.cos(p.yaw),sy=Math.sin(p.yaw);
+  const dx=sy*cp,dy=sp,dz=cy*cp;
+  let last=[Math.floor(p.x),Math.floor(p.y+1.62),Math.floor(p.z)];
+  for(let t=0;t<max;t+=.035){
+    const x=p.x+dx*t,y=p.y+1.62+dy*t,z=p.z+dz*t;
+    const c=[Math.floor(x),Math.floor(y),Math.floor(z)];
+    if(c[0]!==last[0]||c[1]!==last[1]||c[2]!==last[2]){
+      if(get(c[0],c[1],c[2])!==AIR)return {hit:c,place:last};
+      last=c;
+    }
+  }
+  return null;
+}
+let lastAction=0;
+canvas.addEventListener("mousedown",e=>{
+  if(!locked)return;
+  e.preventDefault();
+  const r=raycast();if(!r)return;
+  const now=performance.now();if(now-lastAction<100)return;lastAction=now;
+  if(e.button===0)set(...r.hit,AIR);
+  if(e.button===2){
+    const [x,y,z]=r.place;
+    const id=hot[selected];
+    if(inside(x,y,z)&&get(x,y,z)===AIR){
+      // Don't place a block intersecting the player.
+      set(x,y,z,id);
+      if(collides(p.x,p.y,p.z))set(x,y,z,AIR);
+    }
+  }
+});
+canvas.addEventListener("contextmenu",e=>e.preventDefault());
+
+/* Simple software voxel renderer.
+   Faces are projected from nearby blocks; farther blocks are
+   skipped for speed. It is deliberately stylized rather than
+   pretending to be a full WebGL Minecraft renderer. */
+function project(x,y,z){
+  const dx=x-p.x,dz=z-p.z,dy=y-(p.y+1.62);
+  const cy=Math.cos(-p.yaw),sy=Math.sin(-p.yaw);
+  const X=dx*cy-dz*sy,Z=dx*sy+dz*cy;
+  const cp=Math.cos(-p.pitch),sp=Math.sin(-p.pitch);
+  const Y=dy*cp-Z*sp,ZZ=dy*sp+Z*cp;
+  if(ZZ<=.08)return null;
+  const f=(H*.62)/Math.tan(Math.PI/4);
+  return [W/2+X*f/ZZ,H/2-Y*f/ZZ,ZZ];
+}
+function shade(hex,fac){
+  const n=parseInt(hex.slice(1),16),r=Math.min(255,((n>>16)&255)*fac)|0,g=Math.min(255,((n>>8)&255)*fac)|0,b=Math.min(255,(n&255)*fac)|0;
+  return `rgb(${r},${g},${b})`;
+}
+const faces=[
+  [[0,0,0],[1,0,0],[1,1,0],[0,1,0],.72], // north
+  [[1,0,1],[0,0,1],[0,1,1],[1,1,1],.82], // south
+  [[0,0,1],[0,0,0],[0,1,0],[0,1,1],.62], // west
+  [[1,0,0],[1,0,1],[1,1,1],[1,1,0],.68], // east
+  [[0,1,0],[1,1,0],[1,1,1],[0,1,1],1.12], // top
+  [[0,0,1],[1,0,1],[1,0,0],[0,0,0],.52] // bottom
+];
+function render(){
+  // sky
+  const g=ctx.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,"#78bdf0");g.addColorStop(1,"#cfeeff");
+  ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+
+  // sun
+  ctx.fillStyle="#fff4b0";ctx.beginPath();ctx.arc(W*.78,H*.18,34,0,Math.PI*2);ctx.fill();
+
+  const range=22, minx=Math.floor(p.x-range),maxx=Math.floor(p.x+range);
+  const minz=Math.floor(p.z-range),maxz=Math.floor(p.z+range);
+  const polys=[];
+  for(let x=minx;x<=maxx;x++)for(let z=minz;z<=maxz;z++){
+    if(x<0||z<0||x>=SIZE||z>=SIZE)continue;
+    for(let y=0;y<MAXY;y++){
+      const id=get(x,y,z);if(!id)continue;
+      const cx=x+.5-p.x,cz=z+.5-p.z;
+      if(cx*cx+cz*cz>range*range)continue;
+      // Only draw faces exposed to air. This cuts the workload dramatically.
+      for(let fi=0;fi<6;fi++){
+        const nx=[0,0,-1,1,0,0][fi],ny=[0,0,0,0,1,-1][fi],nz=[-1,1,0,0,0,0][fi];
+        if(get(x+nx,y+ny,z+nz)!==AIR)continue;
+        const f=faces[fi],pts=f.slice(0,4).map(v=>project(x+v[0],y+v[1],z+v[2]));
+        if(pts.some(q=>!q))continue;
+        const depth=pts.reduce((a,q)=>a+q[2],0)/4;
+        polys.push({pts,depth,color:shade(colors[id],f[4])});
+      }
+    }
+  }
+  polys.sort((a,b)=>b.depth-a.depth);
+  for(const q of polys){
+    ctx.beginPath();ctx.moveTo(q.pts[0][0],q.pts[0][1]);
+    for(let i=1;i<4;i++)ctx.lineTo(q.pts[i][0],q.pts[i][1]);
+    ctx.closePath();ctx.fillStyle=q.color;ctx.fill();
+    ctx.strokeStyle="#0003";ctx.stroke();
+  }
+}
+function loop(t){
+  const dt=Math.min(.05,(t-prev)/1000);prev=t;
+  move(dt);render();
+  frames++;if(t-fpsTime>500){fps=Math.round(frames*1000/(t-fpsTime));frames=0;fpsTime=t}
+  const r=raycast();
+  status.innerHTML=`<b>HTML Minecraft</b><br>XYZ: ${p.x.toFixed(1)} ${p.y.toFixed(1)} ${p.z.toFixed(1)}<br>Block: ${r?names[get(...r.hit)]:"—"}<br>FPS: ${fps}`;
+  requestAnimationFrame(loop);
+}
+fpsTime=performance.now();requestAnimationFrame(loop);
+</script>
+<p>End of the file.</p>
+</body>
+</html>'''
+
+path = Path("/mnt/data/Minecraft_HTML_Single_File.html")
+path.write_text(html, encoding="utf-8")
+print(f"Created {path} ({path.stat().st_size:,} bytes)")
