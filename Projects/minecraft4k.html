@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Minecraft 4K Remade UO</title>
+<style>
+  html, body { margin:0; overflow:hidden; height:100%; background:#000; }
+  canvas { display:block; image-rendering:pixelated; width:100vw; height:100vh; }
+</style>
+</head>
+<body>
+<canvas id="game" width="424" height="240"></canvas>
+<script>
+let canvas=document.getElementById('game'), ctx=canvas.getContext('2d');
+let w=canvas.width, h=canvas.height;
+let map=new Array(64*64*64), texmap=new Array(16*16*3*16);
+let pixels=ctx.createImageData(w,h);
+for(let i=0;i<w*h;i++) pixels.data[i*4+3]=255;
+
+// Texture generation
+for(let i=1;i<16;i++){
+    let br=255-(Math.random()*96|0);
+    for(let y=0;y<16*3;y++){
+        for(let x=0;x<16;x++){
+            let color=0x966C4A;
+            if(i==4) color=0x7F7F7F;
+            if(i!=4 || (Math.random()*3|0)==0) br=255-(Math.random()*96|0);
+            if(i==1 && y<(((x*x*3+x*81)>>2)&3)+18) color=0x6AAA40;
+            else if(i==1 && y<(((x*x*3+x*81)>>2)&3)+19) br=br*2/3;
+            if(i==7){
+                color=0x675231;
+                if(x>0 && x<15 && ((y>0 && y<15) || (y>32 && y<47))){
+                    color=0xBC9862;
+                    let xd=x-7, yd=(y&15)-7;
+                    if(xd<0) xd=1-xd; if(yd<0) yd=1-yd; if(yd>xd) xd=yd;
+                    br=196-(Math.random()*32|0)+xd%3*32;
+                } else if((Math.random()*2|0)==0){
+                    br=br*(150-(x&1)*100)/100;
+                }
+            }
+            if(i==5){ color=0xB53A15; if((x+(y>>2)*4)%8==0||y%4==0) color=0xBCAFA5; }
+            if(i==9) color=0x4040ff;
+            if(i==8){ color=0x50D937; if((Math.random()*2|0)==0){ color=0; br=255; } }
+
+            let brr = br; 
+            let col=(((color>>16)&0xff)*brr/255)<<16|(((color>>8)&0xff)*brr/255)<<8|((color&0xff)*brr/255);
+            texmap[x+y*16+i*256*3]=col;
+        }
+    }
+}
+
+// Map generation
+for(let x=0;x<64;x++){
+    for(let y=0;y<64;y++){
+        for(let z=0;z<64;z++){
+            let i = z<<12 | y<<6 | x;
+            let yd=(y-32.5)*0.4, zd=(z-32.5)*0.4;
+            map[i]=Math.random()*16|0;
+            if(Math.random() > Math.sqrt(Math.sqrt(yd*yd+zd*zd))-0.8) map[i]=0;
+        }
+    }
+}
+
+// Small block cluster in center
+for(let x=28;x<36;x++){
+    for(let y=28;y<36;y++){
+        for(let z=28;z<36;z++){
+            map[(z<<12)|(y<<6)|x]=1;
+        }
+    }
+}
+
+// Player
+let player={x:32.5,y:32.5,z:32.5,rotX:Math.PI/2,rotY:0};
+let keys={}, mouse={down:false};
+document.addEventListener('keydown', e=>keys[e.key.toLowerCase()]=true);
+document.addEventListener('keyup', e=>keys[e.key.toLowerCase()]=false);
+canvas.addEventListener('mousedown', e=>mouse.down=true);
+canvas.addEventListener('mouseup', e=>mouse.down=false);
+canvas.addEventListener('mousemove', e=>{
+    if(e.buttons){ player.rotX += e.movementX*0.002; player.rotY -= e.movementY*0.002; }
+});
+
+// Prevent right-click menu and place block
+canvas.addEventListener('contextmenu', e=>{ e.preventDefault(); placeBlock(); });
+
+// Player movement
+function updatePlayer(){
+    let speed=0.2, cosY=Math.cos(player.rotY), sinY=Math.sin(player.rotY);
+    if(keys['s']){ player.x+=sinY*speed; player.z+=cosY*speed; }
+    if(keys['w']){ player.x-=sinY*speed; player.z-=cosY*speed; }
+    if(keys['d']){ player.x-=cosY*speed; player.z+=sinY*speed; }
+    if(keys['a']){ player.x+=cosY*speed; player.z-=sinY*speed; }
+    if(keys[' ']) player.y+=speed;
+    if(keys['shift']) player.y-=speed;
+}
+
+// Place block in front of player
+function placeBlock(){
+    let range = 5;
+    let xd = Math.sin(player.rotY);
+    let zd = Math.cos(player.rotY);
+    let yd = 0; // no vertical offset for simplicity
+    let px=player.x, py=player.y, pz=player.z;
+    for(let i=0;i<range;i+=0.5){
+        let xi=Math.floor(px + xd*i);
+        let yi=Math.floor(py + yd*i);
+        let zi=Math.floor(pz + zd*i);
+        let index=(zi&63)<<12 | (yi&63)<<6 | (xi&63);
+        if(map[index]===0){
+            map[index]=1; // grass block
+            break;
+        }
+    }
+}
+
+// Renderer
+function render(){
+    let xRot=player.rotX, yRot=player.rotY;
+    let yCos=Math.cos(yRot), ySin=Math.sin(yRot);
+    let xCos=Math.cos(xRot), xSin=Math.sin(xRot);
+
+    for(let x=0;x<w;x++){
+        let ___xd=(x-w/2)/h;
+        for(let y=0;y<h;y++){
+            let __yd=(y-h/2)/h, __zd=1;
+            let ___zd=__zd*yCos+__yd*ySin;
+            let _yd=__yd*yCos-__zd*ySin;
+            let _xd=___xd*xCos+___zd*xSin;
+            let _zd=___zd*xCos-___xd*xSin;
+
+            let col=0, br=255, ddist=0, closest=32;
+            for(let d=0;d<3;d++){
+                let dimLength=_xd; if(d==1) dimLength=_yd; if(d==2) dimLength=_zd;
+                let ll=1/Math.abs(dimLength);
+                let xd=_xd*ll, yd=_yd*ll, zd=_zd*ll;
+                let initial=(d==0?player.x:(d==1?player.y:player.z))-(d==0?player.x|0:(d==1?player.y|0:player.z|0));
+                if(dimLength>0) initial=1-initial;
+                let dist=ll*initial;
+                let xp=player.x+xd*initial, yp=player.y+yd*initial, zp=player.z+zd*initial;
+                if(dimLength<0){ if(d==0)xp--; if(d==1)yp--; if(d==2)zp--; }
+                while(dist<closest){
+                    let tex=map[(zp&63)<<12|(yp&63)<<6|(xp&63)];
+                    if(tex>0){
+                        let u=((xp+zp)*16)&15, v=((yp*16)&15)+16;
+                        if(d==1){ u=(xp*16)&15; v=((zp*16)&15); if(yd<0)v+=32; }
+                        let cc=texmap[u+v*16+tex*256*3];
+                        if(cc>0){ col=cc; ddist=255-((dist/32*255)|0); br=255*(255-((d+2)%3)*50)/255; closest=dist; }
+                    }
+                    xp+=xd; yp+=yd; zp+=zd; dist+=ll;
+                }
+            }
+
+            let r=((col>>16)&0xff)*br*ddist/(255*255);
+            let g=((col>>8)&0xff)*br*ddist/(255*255);
+            let b=(col&0xff)*br*ddist/(255*255);
+
+            pixels.data[(x+y*w)*4+0]=isNaN(r)?0:r;
+            pixels.data[(x+y*w)*4+1]=isNaN(g)?0:g;
+            pixels.data[(x+y*w)*4+2]=isNaN(b)?0:b;
+        }
+    }
+    ctx.putImageData(pixels,0,0);
+}
+
+function loop(){ updatePlayer(); render(); requestAnimationFrame(loop); }
+loop();
+</script>
+</body>
+</html>
